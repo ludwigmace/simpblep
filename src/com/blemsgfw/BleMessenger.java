@@ -41,6 +41,8 @@ public class BleMessenger {
     
     private String myIdentifier;
     private String myFriendlyName;
+    
+    private int CurrentParentMessage;
 
     // keep a map of our messages for a connection session - this may not work out; or we may need to keep a map per peer
     private Map<Integer, BleMessage> bleMessageMap;
@@ -104,19 +106,54 @@ public class BleMessenger {
 		
 	}
 	
-	
+	// maybe we shouldn't use this to send our identity stuff . . .
     private void sendIndicateNotify(String remote, UUID uuid) {
-    	byte[] nextPacket = blmsgOut.GetPacket().MessageBytes;
     	
-    	boolean msgSent = myGattServer.updateCharValue(uuid, nextPacket);
-		
-    	if (blmsgOut.PendingPacketStatus()) {
-    		// i'll need to change this to do the lookup thing . . .
-    		sendIndicateNotify(remote,uuid);
-    	}
+    	// if we've got messages to send
+    	if (bleMessageMap.size() > 0) {
+    	
+    		// get the current message to send
+	    	blmsgOut = bleMessageMap.get(CurrentParentMessage);
+	    	
+	    	// get the next packet to send
+	    	byte[] nextPacket = blmsgOut.GetPacket().MessageBytes;
+	    	
+	    	// update the value of this characteristic, which will send to subscribers
+	    	Log.v(TAG, "send next packet");
+	    	myGattServer.updateCharValue(uuid, nextPacket);
+	    	
+	    	if (!blmsgOut.PendingPacketStatus()) {
+	    		Log.v(TAG, "message is sent, remove it from the map");
+	    		// if this message is sent, remove from our Map queue and increment our counter
+	    		bleMessageMap.remove(CurrentParentMessage);
+	    		CurrentParentMessage++;
+	    	} 
+	    	
+    		Log.v(TAG, "recurse!");
+    		sendIndicateNotify(remote, uuid);
+	    	
+    	}/* else {
+    		// if we've got no more messages, then we need to call a disconnect
+    		// however if we 
+    		myGattServer.closeConnection();
+    	}*/
     	
     }
     
+    public void HandleIncomingID() {
+		
+		// now for this peer let's go ahead and pull all his messages and add them to our map
+		BlePeer p;
+		
+		String puKfingerprint = "";
+		p = peerMap.get(puKfingerprint);  // won't work, pulls of bt address
+		
+		// loop over p.getMessage(i) or something and do a bleMessageMap.put(x, msg) foreach
+		// . . . incrementing CurrentParentMessage each time
+		
+		// hole up, we don't have a peermap before this connection, at least based on device address
+		// it'll have to be based on ID sent to us, ie the PuKfp
+    }
 
     MyGattServerHandler defaultHandler = new MyGattServerHandler() {
     	
@@ -129,18 +166,11 @@ public class BleMessenger {
     		// create/reset our message map for our connection
     		bleMessageMap =  new HashMap<Integer, BleMessage>();
     		
+    		CurrentParentMessage = 0;
+    		
     		// add our id message to this message map
     		bleMessageMap.put(0, idMessage);
     		Log.v(TAG, "id message added to connection's message map");
-    		
-    		// now for this peer let's go ahead and pull all his messages and add them to our map
-    		BlePeer p;
-    		
-    		if (peerMap.containsKey(device)) {
-    			p = peerMap.get(device);
-    		}
-    		
-    		// loop over p.getMessage(i) or something and do a bleMessageMap.put(x, msg) foreach
     		
     	}
 
@@ -205,9 +235,8 @@ public class BleMessenger {
     	public void handleNotifyRequest(String device, UUID uuid) {
     		
     		// we're connected, so initiate send to "device", to whom we're already connected
-    		myGattServer.updateCharValue(uuid, new String("i'm listening").getBytes());
-    		
-    		
+    		Log.v(TAG, "from handleNotifyRequest, initiate sending messages");
+    		sendIndicateNotify(device, uuid);
     		
     		/* look this connectee up via their id information
 			even though you can only be connected to one central at a time, you could lose your

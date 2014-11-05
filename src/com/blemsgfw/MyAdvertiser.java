@@ -104,6 +104,10 @@ public class MyAdvertiser {
    
 	}
 	
+	public void closeConnection() {
+		btGattServer.cancelConnection(btClient);
+	}
+	
 	public boolean updateCharValue(UUID charUUID, byte[] value) {
 		
 		// get the Characteristic we want to update
@@ -379,7 +383,9 @@ public class MyAdvertiser {
         @Override
         public void onConnectionStateChange(BluetoothDevice device, int status, int newState) {
             super.onConnectionStateChange(device, status, newState);
-            
+            if (newState == 2) {
+            	btClient = device;
+            }
             Log.v(TAG, "onConnectionStateChange status=" + status + "->" + newState);
             
             defaultHandler.ConnectionState(device.getAddress(), status, newState);

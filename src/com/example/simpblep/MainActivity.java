@@ -95,6 +95,7 @@ public class MainActivity extends Activity {
 		// there is no recipient, so the first 20 bytes are empty
 		// the sender is our app, so the next 20 bytes are our fingerprint
 		
+		// now we need to create the payload with our friendly name and public key
 		byte[] newMsg = Bytes.concat(new byte[20], rsaKey.PuFingerprint());
 		BleMessage m = new BleMessage();
 		m.setMessage(newMsg);
