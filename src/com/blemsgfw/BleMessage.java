@@ -190,18 +190,24 @@ public class BleMessage {
 		 * - payload
 		 */
 		
+		Log.v(TAG, "unbundling message");
+		
 		byte[] allBytes = getAllBytes();
 		
-		byte[] msgType = Arrays.copyOfRange(allBytes, 0, 1); // byte 0
-		RecipientFingerprint = Arrays.copyOfRange(allBytes, 1, 21); // bytes 1-20
-		SenderFingerprint = Arrays.copyOfRange(allBytes, 21, 41); // bytes 21-40
-		MessageHash = Arrays.copyOfRange(allBytes, 41, 61); // bytes 41-60
-		MessagePayload = Arrays.copyOfRange(allBytes, 61, allBytes.length+1); //bytes 61 through end
+		if (allBytes.length >= 61) {
+		
+			byte[] msgType = Arrays.copyOfRange(allBytes, 0, 1); // byte 0
+			RecipientFingerprint = Arrays.copyOfRange(allBytes, 1, 21); // bytes 1-20
+			SenderFingerprint = Arrays.copyOfRange(allBytes, 21, 41); // bytes 21-40
+			MessageHash = Arrays.copyOfRange(allBytes, 41, 61); // bytes 41-60
+			MessagePayload = Arrays.copyOfRange(allBytes, 61, allBytes.length+1); //bytes 61 through end
 
-		if (msgType.equals(new byte[] {0x01})) {
-			MessageType = "identity";
-		} else {
-			MessageType = "direct";
+			if (msgType.equals(new byte[] {0x01})) {
+				MessageType = "identity";
+			} else {
+				MessageType = "direct";
+			}
+		
 		}
 		
 		

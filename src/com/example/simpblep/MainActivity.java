@@ -84,7 +84,7 @@ public class MainActivity extends Activity {
 		myFingerprint = bytesToHex(rsaKey.PuFingerprint());
 		
 		// create a messenger along with the context (for bluetooth operations)
-		bleMessenger = new BleMessenger(bo, btMgr, btAdptr, this);
+		bleMessenger = new BleMessenger(bo, btMgr, btAdptr, this, bleMessageStatus);
         
 		// generate message of particular byte size
 		byte[] bytesMessage = benchGenerateMessage(45);
@@ -128,24 +128,37 @@ public class MainActivity extends Activity {
 		@Override
 		public void handleReceivedMessage(String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType) {
 
+			Log.v(TAG, "received msg of type:"+ msgType);
+			
 			// this is an identity message so handle it as such
 			if (msgType.equalsIgnoreCase("identity")) {
+				Log.v(TAG, "received identity msg"); 
+				
+				
 				if (recipientFingerprint.length() == 0) {
 					// there is no recipient; this is just an identifying message
 				} else if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
 					// recipient is us!
 				} else if (bleFriends.containsValue(recipientFingerprint)) {
-					// the recipient is a friend of ours
+					Log.v(TAG, "received msg from existing friend, payload size:"+ String.valueOf(payload.length));
 				}
 				
 				if (bleFriends.containsValue(senderFingerprint)) {
 					// we know the sender, check for any messages we want to send them
 				} else {
+					
+					BlePeer b = new BlePeer("");
+					b.SetName("getNamefromPayload");
+					bleFriends.put(senderFingerprint, b);
+					
+					Log.v(TAG, "received msg from new friend, payload size:"+ String.valueOf(payload.length));
 					// we don't know the sender and should add them;
 					// parse the public key & friendly name out of the payload, and add this as a new person
 				}
 				
 				// the First message we send them, however, needs to be our own ID message
+			} else {
+				Log.v(TAG, "received data msg, payload size:"+ String.valueOf(payload.length));
 			}
 			
 		}

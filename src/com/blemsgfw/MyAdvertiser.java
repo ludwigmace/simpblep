@@ -472,22 +472,15 @@ public class MyAdvertiser {
         @Override
         public void onCharacteristicWriteRequest(BluetoothDevice device, int requestId, BluetoothGattCharacteristic characteristic, boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
 
-        	String decoded = new String(value);
-        	
         	characteristic.setValue(value);
-        	
-        	try {
-				decoded = new String(value, "UTF-8");
-			} catch (UnsupportedEncodingException e) {
-				e.printStackTrace();
-			}
-        	Log.d(TAG, "tried to write value " + decoded);
         	
         	// get the characteristic that was affected, and call its handler!
             MyBluetoothGattCharacteristic myBGC = (MyBluetoothGattCharacteristic) myBGCs.get(characteristic.getUuid());
 
             // since this is a Write request, use the incomingBytes method for the characteristic we want
-            myBGC.charHandler.incomingBytes(characteristic.getUuid(), value);
+            // -- device, requestId, characteristic, preparedwrite, responseneeded, offset, value
+            Log.v(TAG, "we got bytes coming in, about to handle them");
+            myBGC.charHandler.incomingMissive(device.getAddress(), characteristic.getUuid(), value);
             
         	// An application must call sendResponse(BluetoothDevice, int, int, int, byte[]) to complete the request.        	
         	btGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);

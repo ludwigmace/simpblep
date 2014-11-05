@@ -43,20 +43,23 @@ public class BleMessenger {
     private String myFriendlyName;
     
     private int CurrentParentMessage;
+    private BlePeer CurrentPeer;
 
     // keep a map of our messages for a connection session - this may not work out; or we may need to keep a map per peer
     private Map<Integer, BleMessage> bleMessageMap;
     
     private Map<String, BlePeer> peerMap;
     
+    
 	public BleMessage idMessage;
     
     List<BleCharacteristic> serviceDef;
 	
-	public BleMessenger(BleMessengerOptions options, BluetoothManager m, BluetoothAdapter a, Context c) {
+	public BleMessenger(BleMessengerOptions options, BluetoothManager m, BluetoothAdapter a, Context c, BleStatusCallback BleStatusCallback) {
 		myIdentifier = options.Identifier;
 		myFriendlyName = options.FriendlyName;
 		
+		bleStatusCallback = BleStatusCallback;
 		btMgr = m;
 		btAdptr = a;
 		ctx = c;
@@ -70,7 +73,7 @@ public class BleMessenger {
 		myGattServer = new MyAdvertiser(uuidServiceBase, ctx, btAdptr, btMgr, defaultHandler);
 	
 		serviceDef.add(new BleCharacteristic("identifier_read", uuidFromBase("100"), MyAdvertiser.GATT_READ));		
-		serviceDef.add(new BleCharacteristic("identifier_writes", uuidFromBase("101"), MyAdvertiser.GATT_READWRITE));
+		serviceDef.add(new BleCharacteristic("identifier_writes", uuidFromBase("101"), MyAdvertiser.GATT_WRITE));
 		serviceDef.add(new BleCharacteristic("data_notify", uuidFromBase("102"), MyAdvertiser.GATT_NOTIFY));
 		//serviceDef.add(new BleCharacteristic("data_indicate", uuidFromBase("103"), MyAdvertiser.GATT_INDICATE));
 		//serviceDef.add(new BleCharacteristic("data_write", uuidFromBase("104"), MyAdvertiser.GATT_WRITE));
@@ -90,87 +93,15 @@ public class BleMessenger {
 	    
 	}
 	
-	public void incomingMissive(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
-		// based on remoteAddress, UUID of remote characteristic, put the incomingBytes into a Message
-		// probably need to have a switchboard function
-		
-		// remoteAddress will allow me to look up the connection, so "sender" won't need to be in the packet
-		// 
-		
-		int parentMessagePacketTotal = 0;
-		
-		Log.v(TAG, "incoming hex bytes:" + bytesToHex(incomingBytes));
-		
-		// if our msg is under a few bytes it can't be valid; return
-    	if (incomingBytes.length < 5) {
-    		Log.v(TAG, "message bytes less than 5");
-    		return;
-    	}
-    	
-    	//get the connection
-    	BlePeer thisConnection = peerMap.get(remoteAddress);
-	    	
-		// stick our incoming bytes into a bytebuffer to do some operations
-    	ByteBuffer bb  = ByteBuffer.wrap(incomingBytes);
-    
-    	// get the Message to which these packets belong as well as the current counter
-    	int parentMessage = incomingBytes[0] & 0xFF;
-    	int packetCounter = (incomingBytes[1] << 8) | incomingBytes[2] & 0xFF;
 
-    	// find the message for this connection that we're building
-    	BleMessage b = thisConnection.getBleMessage(parentMessage);
-    	
-    	// your packet payload will be the size of the incoming bytes less our 3 needed for the header (ref'd above)
-    	byte[] packetPayload = new byte[incomingBytes.length - 3];
-    	
-    	// throw these bytes into our payload array
-    	bb.get(packetPayload, 2, incomingBytes.length - 3);
-    	
-    	// if our current packet counter is ZERO, then we can expect our payload to be:
-    	// the number of packets we're expecting
-    	if (packetCounter == 0) {
-    		// right now this is only going to be a couple of bytes
-    		parentMessagePacketTotal = (incomingBytes[3] << 8) | incomingBytes[4] & 0xFF;
-    		b.BuildMessageFromPackets(packetCounter, packetPayload, parentMessagePacketTotal);
-    	} else {
-    		// otherwise throw this packet payload into the message
-    		b.BuildMessageFromPackets(packetCounter, packetPayload);	
-    	}
-    	
-    	// check if this particular message is done; ie, is it still pending packets?
-    	if (b.PendingPacketStatus() == false) {
-    		
-    		// this message receipt is now complete
-    		// so now we need to handle that completed state
-    		
-    		// if this particular message was an identifying message, then:
-    		// - send our identity over
-    		// - return friendly name to calling program
-
-    		byte[] payload = b.MessagePayload;
-    		String recipientFingerprint = bytesToHex(b.RecipientFingerprint);
-    		String senderFingerprint = bytesToHex(b.SenderFingerprint);
-    		String msgType = b.MessageType;
-    		
-    		bleStatusCallback.handleReceivedMessage(recipientFingerprint, senderFingerprint, payload, msgType);
-    		
-    		// check message integrity here?
-    		// what about encryption?
-    		
-    		// how do i parse the payload if the message contains handshake/identity?
-    	}
-    	
-		
-		
-	}
 	
 	public void BeFound() {
 	
 		
 		// have this pull from the service definition
-		myGattServer.addChar(MyAdvertiser.GATT_READ, uuidFromBase("100"), controlHandler);
-		myGattServer.addChar(MyAdvertiser.GATT_READWRITE, uuidFromBase("101"), controlHandler);
-		myGattServer.addChar(MyAdvertiser.GATT_NOTIFY, uuidFromBase("102"), controlHandler);
+		myGattServer.addChar(MyAdvertiser.GATT_READ, uuidFromBase("100"), defaultHandler);
+		myGattServer.addChar(MyAdvertiser.GATT_WRITE, uuidFromBase("101"), defaultHandler);
+		myGattServer.addChar(MyAdvertiser.GATT_NOTIFY, uuidFromBase("102"), defaultHandler);
 		
 		myGattServer.updateCharValue(uuidFromBase("100"), new String(myIdentifier + "|" + myFriendlyName).getBytes());
 		myGattServer.updateCharValue(uuidFromBase("101"), new String("i'm listening").getBytes());
@@ -231,36 +162,6 @@ public class BleMessenger {
 
     MyGattServerHandler defaultHandler = new MyGattServerHandler() {
     	
-    	public void handleReadRequest(UUID uuid) { }
-    	
-    	public void handleNotifyRequest(UUID uuid) { }
-    	
-    	public void ConnectionState(String device, int status, int newStatus) {
-    		
-    		// create/reset our message map for our connection
-    		bleMessageMap =  new HashMap<Integer, BleMessage>();
-    		
-    		CurrentParentMessage = 0;
-    		
-    		// add our id message to this message map
-    		bleMessageMap.put(0, idMessage);
-    		Log.v(TAG, "id message added to connection's message map");
-    		
-    	}
-
-		public void incomingBytes(UUID charUUID, byte[] inData) { }
-
-		@Override
-		public void handleNotifyRequest(String device, UUID uuid) {
-			
-		}
-    	
-    };
-
-	
-
-	MyGattServerHandler dataHandler = new MyGattServerHandler() {
-    	
     	public void handleReadRequest(UUID uuid) {
     		
     		byte[] nextPacket = blmsgOut.GetPacket().MessageBytes;
@@ -273,77 +174,92 @@ public class BleMessenger {
     		}
     	}
     	
-    	public void handleNotifyRequest(UUID uuid) { 
+    	public void ConnectionState(String device, int status, int newStatus) {
     		
-        	byte[] nextPacket = blmsgOut.GetPacket().MessageBytes;
-        	boolean msgSent = myGattServer.updateCharValue(uuid, nextPacket);
-        	
-        	if (msgSent) {        	
-        		Log.v(TAG, "client notified with initial message");
-        	} else {
-        		Log.v(TAG, "client NOT notified with initial message");
-        	}
+    		if (newStatus == 2) {
     		
-        	// call your self-calling function to keep sending
-        	//sendIndicateNotify(uuid);
+	    		// create/reset our message map for our connection
+	    		bleMessageMap =  new HashMap<Integer, BleMessage>();
+	    		CurrentParentMessage = 0;
+	    		
+	    		// add our id message to this message map
+	    		bleMessageMap.put(0, idMessage);
+	    		
+	    		Log.v(TAG, "id message added to connection's message map");
+	    		
+	    		CurrentPeer = new BlePeer(device); // make a new peer with their address, although that is unhelpful
     		
-    	}
-    	
-    	public void ConnectionState(String dude, int status, int newStatus) {
+    		}
     		
     	}
 
-		public void incomingBytes(UUID charUUID, byte[] inData) { }
+    	public void incomingMissive(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
+    		// based on remoteAddress, UUID of remote characteristic, put the incomingBytes into a Message
+    		// probably need to have a switchboard function
+    		
+    		int parentMessagePacketTotal = 0;
+    		
+    		Log.v(TAG, "incoming hex bytes:" + bytesToHex(incomingBytes));
+    		
+    		// if our msg is under a few bytes it can't be valid; return
+        	if (incomingBytes.length < 10) {
+        		Log.v(TAG, "message bytes less than 10");
+        		return;
+        	}
+        	
+    		// stick our incoming bytes into a bytebuffer to do some operations
+        	ByteBuffer bb  = ByteBuffer.wrap(incomingBytes);
+        
+        	// get the Message to which these packets belong as well as the current counter
+        	int parentMessage = incomingBytes[0] & 0xFF;
+        	int packetCounter = (incomingBytes[1] << 8) | incomingBytes[2] & 0xFF;
+
+        	// find the message we're building, identified by the first byte (cast to an integer 0-255)
+        	BleMessage b = CurrentPeer.getBleMessageIn(parentMessage);
+        	
+        	// your packet payload will be the size of the incoming bytes less our 3 needed for the header (ref'd above)
+        	byte[] packetPayload = new byte[incomingBytes.length];
+        	
+        	// throw these bytes into our payload array
+        	bb.get(packetPayload, 2, incomingBytes.length - 3);
+        	
+        	// if our current packet counter is ZERO, then we can expect our payload to be:
+        	// the number of packets we're expecting
+        	if (packetCounter == 0) {
+        		// right now this is only going to be a couple of bytes
+        		parentMessagePacketTotal = (incomingBytes[3] << 8) | incomingBytes[4] & 0xFF;
+        		
+        		Log.v(TAG, "parent message packet total is:" + String.valueOf(parentMessagePacketTotal));
+        		b.BuildMessageFromPackets(packetCounter, packetPayload, parentMessagePacketTotal);
+        	} else {
+        		// otherwise throw this packet payload into the message
+        		b.BuildMessageFromPackets(packetCounter, packetPayload);	
+        	}
+        	
+        	// if this particular message is done; ie, is it still pending packets?
+        	if (b.PendingPacketStatus() == false) {
+        		
+        		bleStatusCallback.handleReceivedMessage(bytesToHex(b.RecipientFingerprint), bytesToHex(b.SenderFingerprint), b.MessagePayload, b.MessageType);
+        		
+        		// check message integrity here?
+        		// what about encryption?
+        		
+        		// how do i parse the payload if the message contains handshake/identity?
+        	}
+        	
+    		
+    		
+    	}
 
 		@Override
 		public void handleNotifyRequest(String device, UUID uuid) {
-			
-		}
-    	
-    };
-    
-    MyGattServerHandler controlHandler = new MyGattServerHandler() {
-    	
-    	public void handleReadRequest(UUID uuid) { }
-    	
-    	public void handleNotifyRequest(String device, UUID uuid) {
-    		
     		// we're connected, so initiate send to "device", to whom we're already connected
     		Log.v(TAG, "from handleNotifyRequest, initiate sending messages");
     		sendIndicateNotify(device, uuid);
-    		
-    		/* look this connectee up via their id information
-			even though you can only be connected to one central at a time, you could lose your
-			 connection and get connected to be a different central, in which case you'd need to
-			 figure out who the hell you're talking to at any given Notify request because
-			 you don't want to send them the wrong message
-			*/
-    		
-    		/*
-    		if (peerMap.containsKey(device)) {
-    			BlePeer p = peerMap.get(device);
-    		}
-    		*/
-			// send them packets until they're disconnected or the message has been sent
-    		
-    		// <frank>HOWEVER!
-    		// if you don't have a device for this central loaded in your peerMap,
-    		// this means they haven't written to you yet, so do you even have anything
-    		// to send to them?  so on first connect, nothing will happen here
-			
-			//firstServiceChar.setValue("HI");
-			//btGattServer.notifyCharacteristicChanged(btClient, firstServiceChar, false);
-    		
-
-    		
-    	}
-    	
-    	public void ConnectionState(String dude, int status, int newStatus) {}
-
-		public void incomingBytes(UUID charUUID, byte[] inData) { }
+		}
     	
     };
-    
+
 
 
     final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();

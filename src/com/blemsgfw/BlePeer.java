@@ -13,27 +13,48 @@ public class BlePeer {
 	private String friendlyName;
 	private Date lastSeen;
 
-	private Map<Integer, BleMessage> peerMessages;
+	private Map<Integer, BleMessage> peerMessagesIn;
+	private Map<Integer, BleMessage> peerMessagesOut;
 	
 
 	public BlePeer(String PeerAddress) {
 		peerAddress = PeerAddress;
 		peerName="";
-		peerMessages = new HashMap<Integer, BleMessage>();
+		peerMessagesIn = new HashMap<Integer, BleMessage>();
+		peerMessagesOut = new HashMap<Integer, BleMessage>();
 	}
 	
 	public String RecipientAddress() {
 		return peerAddress;
 	}
 	
-	public BleMessage getBleMessage(int MessageIdentifier) {
+	
+	public String GetFingerprint() {
+		return bytesToHex(peerPublicKeyFingerprint);
+	}
+
+	public void SetFingerprint(byte[] fp) {
+		peerPublicKeyFingerprint = fp;
+	}
+	
+	public BleMessage getBleMessageIn(int MessageIdentifier) {
 
 		// if there isn't already a message with this identifier, add one
-		if (!peerMessages.containsKey(MessageIdentifier)) {
-			peerMessages.put(MessageIdentifier, new BleMessage());
+		if (!peerMessagesIn.containsKey(MessageIdentifier)) {
+			peerMessagesIn.put(MessageIdentifier, new BleMessage());
 		}
 		
-		return peerMessages.get(MessageIdentifier);
+		return peerMessagesIn.get(MessageIdentifier);
+	}
+	
+	public BleMessage getBleMessageOut(int MessageIdentifier) {
+
+		// if there isn't already a message with this identifier, add one
+		if (!peerMessagesOut.containsKey(MessageIdentifier)) {
+			peerMessagesOut.put(MessageIdentifier, new BleMessage());
+		}
+		
+		return peerMessagesOut.get(MessageIdentifier);
 	}
 	
 	public void SetName(String PeerName) {
@@ -43,5 +64,16 @@ public class BlePeer {
 	public String GetName() {
 		return peerName;
 	}
+	
+    final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+    private static String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        for ( int j = 0; j < bytes.length; j++ ) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+        }
+        return new String(hexChars);
+    }
 	
 }
