@@ -90,6 +90,80 @@ public class BleMessenger {
 	    
 	}
 	
+	public void incomingMissive(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
+		// based on remoteAddress, UUID of remote characteristic, put the incomingBytes into a Message
+		// probably need to have a switchboard function
+		
+		// remoteAddress will allow me to look up the connection, so "sender" won't need to be in the packet
+		// 
+		
+		int parentMessagePacketTotal = 0;
+		
+		Log.v(TAG, "incoming hex bytes:" + bytesToHex(incomingBytes));
+		
+		// if our msg is under a few bytes it can't be valid; return
+    	if (incomingBytes.length < 5) {
+    		Log.v(TAG, "message bytes less than 5");
+    		return;
+    	}
+    	
+    	//get the connection
+    	BlePeer thisConnection = peerMap.get(remoteAddress);
+	    	
+		// stick our incoming bytes into a bytebuffer to do some operations
+    	ByteBuffer bb  = ByteBuffer.wrap(incomingBytes);
+    
+    	// get the Message to which these packets belong as well as the current counter
+    	int parentMessage = incomingBytes[0] & 0xFF;
+    	int packetCounter = (incomingBytes[1] << 8) | incomingBytes[2] & 0xFF;
+
+    	// find the message for this connection that we're building
+    	BleMessage b = thisConnection.getBleMessage(parentMessage);
+    	
+    	// your packet payload will be the size of the incoming bytes less our 3 needed for the header (ref'd above)
+    	byte[] packetPayload = new byte[incomingBytes.length - 3];
+    	
+    	// throw these bytes into our payload array
+    	bb.get(packetPayload, 2, incomingBytes.length - 3);
+    	
+    	// if our current packet counter is ZERO, then we can expect our payload to be:
+    	// the number of packets we're expecting
+    	if (packetCounter == 0) {
+    		// right now this is only going to be a couple of bytes
+    		parentMessagePacketTotal = (incomingBytes[3] << 8) | incomingBytes[4] & 0xFF;
+    		b.BuildMessageFromPackets(packetCounter, packetPayload, parentMessagePacketTotal);
+    	} else {
+    		// otherwise throw this packet payload into the message
+    		b.BuildMessageFromPackets(packetCounter, packetPayload);	
+    	}
+    	
+    	// check if this particular message is done; ie, is it still pending packets?
+    	if (b.PendingPacketStatus() == false) {
+    		
+    		// this message receipt is now complete
+    		// so now we need to handle that completed state
+    		
+    		// if this particular message was an identifying message, then:
+    		// - send our identity over
+    		// - return friendly name to calling program
+
+    		byte[] payload = b.MessagePayload;
+    		String recipientFingerprint = bytesToHex(b.RecipientFingerprint);
+    		String senderFingerprint = bytesToHex(b.SenderFingerprint);
+    		String msgType = b.MessageType;
+    		
+    		bleStatusCallback.handleReceivedMessage(recipientFingerprint, senderFingerprint, payload, msgType);
+    		
+    		// check message integrity here?
+    		// what about encryption?
+    		
+    		// how do i parse the payload if the message contains handshake/identity?
+    	}
+    	
+		
+		
+	}
+	
 	public void BeFound() {
 	
 		
