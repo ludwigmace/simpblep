@@ -6,7 +6,9 @@ import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 
@@ -77,9 +79,22 @@ public class KeyStuff {
     	return mPair.getPublic().getEncoded();
     }
     
-    public String PuFingerprint() {
-    	return bytesToHex(this.PublicKey());
+    public byte[] PuFingerprint() {
+        MessageDigest md = null;
+        
+        try {
+			md = MessageDigest.getInstance("SHA-1");
+		} catch (NoSuchAlgorithmException e) {
+
+			e.printStackTrace();
+		}
+        
+        // i want my digest to be the packet size less the 2 bytes needed for counter and size
+        byte[] myF = md.digest(this.PublicKey());
+    	
+    	return myF;
     }
+
     
     // Wrap a SecretKey using the public key assigned to this wrapper.
     public byte[] wrap(SecretKey key) throws GeneralSecurityException {

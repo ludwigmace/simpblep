@@ -121,6 +121,7 @@ public class MyAdvertiser {
 
 			Log.v(TAG, "characteristic is Notify/Indicate");
 
+			// having a list of subscribers might be dumb, because you can only send to one central
 			if (mySubscribers.get(bgc) != null) {
 				Log.v(TAG, "client has subscribed; try to send");
 				
@@ -150,11 +151,7 @@ public class MyAdvertiser {
 	public void queueMessage(byte[] msgBytes) {
 		queuedMsg = msgBytes;
 	}
-	
-	// helper function to send string
-	public boolean updateCharValue(UUID charUUID, String value) {
-		return updateCharValue(charUUID, value.getBytes()); // Android, so default charset is UTF-8
-	}
+
 	
 	public void advertiseOff() {
         if(!gattAdvStatus) return;
@@ -383,9 +380,11 @@ public class MyAdvertiser {
         public void onConnectionStateChange(BluetoothDevice device, int status, int newState) {
             super.onConnectionStateChange(device, status, newState);
             
+            Log.v(TAG, "onConnectionStateChange status=" + status + "->" + newState);
+            
             defaultHandler.ConnectionState(device.getAddress(), status, newState);
             
-            //Log.d(TAG, "onConnectionStateChange status=" + status + "->" + newState);
+            
         }
 
         @Override
@@ -406,6 +405,7 @@ public class MyAdvertiser {
         @Override
         public void onDescriptorWriteRequest (BluetoothDevice device, int requestId, BluetoothGattDescriptor descriptor, boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
         	Log.d(TAG, "onWriteDescriptorCalled");
+        	// pretty much this is only called when somebody subscribes to indications/notifications
         	
         	String status = "";
         	
@@ -426,13 +426,14 @@ public class MyAdvertiser {
         	// once this goes off, the client should know they're all signed up (or not) for updates
         	btGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
         	
-        	// find my custom characteristic class and call the correct handler
+        	// find my custom characteristic class . . .
         	MyBluetoothGattCharacteristic myBGC = (MyBluetoothGattCharacteristic) myBGCs.get(descriptor.getCharacteristic().getUuid());
         	
+        	// . . . and call the correct handler
         	if (status == "notify" || status == "indicate") {
-        		myBGC.charHandler.handleNotifyRequest(myBGC.getUuid());
+        		myBGC.charHandler.handleNotifyRequest(device.getAddress(), myBGC.getUuid());
         	}
-        	
+
         }
         
         @Override

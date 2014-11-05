@@ -95,6 +95,7 @@ public class BleMessage {
 		setMessage(MessageBytes, 20);
 	}
 	
+	
 	public void setMessage(byte[] MessageBytes, int MessagePacketSize) {
 
 		messagePacketSize = MessagePacketSize; 

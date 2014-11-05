@@ -47,6 +47,8 @@ public class BleMessenger {
     
     private Map<String, BlePeer> peerMap;
     
+	public BleMessage idMessage;
+    
     List<BleCharacteristic> serviceDef;
 	
 	public BleMessenger(BleMessengerOptions options, BluetoothManager m, BluetoothAdapter a, Context c) {
@@ -71,7 +73,8 @@ public class BleMessenger {
 		//serviceDef.add(new BleCharacteristic("data_indicate", uuidFromBase("103"), MyAdvertiser.GATT_INDICATE));
 		//serviceDef.add(new BleCharacteristic("data_write", uuidFromBase("104"), MyAdvertiser.GATT_WRITE));
 
-		
+	
+		// when we connect, send the id message to the connecting party
 	}
 	
 	private UUID uuidFromBase(String smallUUID) {
@@ -81,16 +84,20 @@ public class BleMessenger {
 		return idUUID;
 	}
 	
+	public void AddMessage() {
+	    
+	}
 	
 	public void BeFound() {
+	
 		
-		
+		// have this pull from the service definition
 		myGattServer.addChar(MyAdvertiser.GATT_READ, uuidFromBase("100"), controlHandler);
 		myGattServer.addChar(MyAdvertiser.GATT_READWRITE, uuidFromBase("101"), controlHandler);
 		myGattServer.addChar(MyAdvertiser.GATT_NOTIFY, uuidFromBase("102"), controlHandler);
 		
-		myGattServer.updateCharValue(uuidFromBase("100"), myIdentifier + "|" + myFriendlyName);
-		myGattServer.updateCharValue(uuidFromBase("101"), "i'm listening");
+		myGattServer.updateCharValue(uuidFromBase("100"), new String(myIdentifier + "|" + myFriendlyName).getBytes());
+		myGattServer.updateCharValue(uuidFromBase("101"), new String("i'm listening").getBytes());
 		
 		// advertising doesn't take much energy, so go ahead and do it
 		myGattServer.advertiseNow();
@@ -98,13 +105,14 @@ public class BleMessenger {
 	}
 	
 	
-    private void sendIndicateNotify(UUID uuid) {
+    private void sendIndicateNotify(String remote, UUID uuid) {
     	byte[] nextPacket = blmsgOut.GetPacket().MessageBytes;
     	
     	boolean msgSent = myGattServer.updateCharValue(uuid, nextPacket);
 		
     	if (blmsgOut.PendingPacketStatus()) {
-    		sendIndicateNotify(uuid);
+    		// i'll need to change this to do the lookup thing . . .
+    		sendIndicateNotify(remote,uuid);
     	}
     	
     }
@@ -116,9 +124,32 @@ public class BleMessenger {
     	
     	public void handleNotifyRequest(UUID uuid) { }
     	
-    	public void ConnectionState(String dude, int status, int newStatus) {}
+    	public void ConnectionState(String device, int status, int newStatus) {
+    		
+    		// create/reset our message map for our connection
+    		bleMessageMap =  new HashMap<Integer, BleMessage>();
+    		
+    		// add our id message to this message map
+    		bleMessageMap.put(0, idMessage);
+    		Log.v(TAG, "id message added to connection's message map");
+    		
+    		// now for this peer let's go ahead and pull all his messages and add them to our map
+    		BlePeer p;
+    		
+    		if (peerMap.containsKey(device)) {
+    			p = peerMap.get(device);
+    		}
+    		
+    		// loop over p.getMessage(i) or something and do a bleMessageMap.put(x, msg) foreach
+    		
+    	}
 
 		public void incomingBytes(UUID charUUID, byte[] inData) { }
+
+		@Override
+		public void handleNotifyRequest(String device, UUID uuid) {
+			
+		}
     	
     };
 
@@ -150,13 +181,20 @@ public class BleMessenger {
         	}
     		
         	// call your self-calling function to keep sending
-        	sendIndicateNotify(uuid);
+        	//sendIndicateNotify(uuid);
     		
     	}
     	
-    	public void ConnectionState(String dude, int status, int newStatus) {}
+    	public void ConnectionState(String dude, int status, int newStatus) {
+    		
+    	}
 
 		public void incomingBytes(UUID charUUID, byte[] inData) { }
+
+		@Override
+		public void handleNotifyRequest(String device, UUID uuid) {
+			
+		}
     	
     };
     
@@ -164,7 +202,38 @@ public class BleMessenger {
     	
     	public void handleReadRequest(UUID uuid) { }
     	
-    	public void handleNotifyRequest(UUID uuid) { }
+    	public void handleNotifyRequest(String device, UUID uuid) {
+    		
+    		// we're connected, so initiate send to "device", to whom we're already connected
+    		myGattServer.updateCharValue(uuid, new String("i'm listening").getBytes());
+    		
+    		
+    		
+    		/* look this connectee up via their id information
+			even though you can only be connected to one central at a time, you could lose your
+			 connection and get connected to be a different central, in which case you'd need to
+			 figure out who the hell you're talking to at any given Notify request because
+			 you don't want to send them the wrong message
+			*/
+    		
+    		/*
+    		if (peerMap.containsKey(device)) {
+    			BlePeer p = peerMap.get(device);
+    		}
+    		*/
+			// send them packets until they're disconnected or the message has been sent
+    		
+    		// <frank>HOWEVER!
+    		// if you don't have a device for this central loaded in your peerMap,
+    		// this means they haven't written to you yet, so do you even have anything
+    		// to send to them?  so on first connect, nothing will happen here
+			
+			//firstServiceChar.setValue("HI");
+			//btGattServer.notifyCharacteristicChanged(btClient, firstServiceChar, false);
+    		
+
+    		
+    	}
     	
     	public void ConnectionState(String dude, int status, int newStatus) {}
 

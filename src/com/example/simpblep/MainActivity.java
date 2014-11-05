@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import com.blemsgfw.BleMessage;
 import com.blemsgfw.BleMessenger;
 import com.blemsgfw.BleMessengerOptions;
 import com.blemsgfw.BlePeer;
@@ -80,9 +81,8 @@ public class MainActivity extends Activity {
 		bo.PublicKey = rsaKey.PublicKey();
 		Log.v(TAG, "pubkey size in bytes:" + String.valueOf(bo.PublicKey.length));
        
-		myFingerprint = rsaKey.PuFingerprint();
+		myFingerprint = bytesToHex(rsaKey.PuFingerprint());
 		
-        
 		// create a messenger along with the context (for bluetooth operations)
 		bleMessenger = new BleMessenger(bo, btMgr, btAdptr, this);
         
@@ -91,6 +91,16 @@ public class MainActivity extends Activity {
 
 		bleFriends = new HashMap<String, BlePeer>();
 		
+		// load up a generic message to be sent to everybody the first time i connect
+		// there is no recipient, so the first 20 bytes are empty
+		// the sender is our app, so the next 20 bytes are our fingerprint
+		
+		byte[] newMsg = Bytes.concat(new byte[20], rsaKey.PuFingerprint());
+		BleMessage m = new BleMessage();
+		m.setMessage(newMsg);
+		
+		// now add this message as our identifier to BleMessenger to send upon any new connection
+		bleMessenger.idMessage = m;
 	}
 
 	@Override
@@ -257,5 +267,16 @@ public class MainActivity extends Activity {
         
         return displayName;
 	}
+
+    final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+    public static String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        for ( int j = 0; j < bytes.length; j++ ) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+        }
+        return new String(hexChars);
+    }
 	
 }

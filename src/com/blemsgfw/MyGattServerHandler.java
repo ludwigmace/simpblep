@@ -10,6 +10,6 @@ public interface MyGattServerHandler {
 	
 	public void handleReadRequest(UUID uuid);
 		
-	public void handleNotifyRequest(UUID uuid);
+	public void handleNotifyRequest(String device, UUID uuid);
 	
 }
