@@ -38,9 +38,14 @@ public class BleMessage {
 	public byte[] MessageHash;
 	public byte[] MessagePayload;
 	
+	private int messageNumber;
 	
 	public void AddRecipient(BleRecipient Recipient) {
 		messageRecipients.add(Recipient);
+	}
+	
+	public void SetMessageNumber(int MessageNumber) {
+		messageNumber = MessageNumber;
 	}
 
 	public void SetRemoteInfo(String RemoteAddress, UUID RemoteCharacteristic) {
@@ -122,16 +127,25 @@ public class BleMessage {
 			e.printStackTrace();
 		}
         
-        // i want my digest to be the packet size less the 2 bytes needed for counter and size
-        byte[] myDigest = Arrays.copyOfRange(md.digest(MessageBytes), 0, messagePacketSize - 2);
+        // i want my digest to be the packet size less the 3 bytes needed for counter and size
+        byte[] myDigest = Arrays.copyOfRange(md.digest(MessageBytes), 0, messagePacketSize - 5);
         
         Log.v(TAG, "first payload is of size: " + String.valueOf(myDigest.length));
         
-        // first byte is control; second byte is packetcount; add on the digest
-        byte[] firstPacket = Bytes.concat(new byte[]{(byte)0x01, (byte)(msgCount & 0xFF)}, myDigest);
+        // first byte is which message this is for the receiver to understand
+        // second/third bytes are current packet
+        // fourth/firth bytes are message size
+        // 6+ is the digest truncated to 15 bytes
+        
+        byte[] msgSize = new byte[2];
+        msgSize[0] = (byte)(msgCount >> 8);
+        msgSize[1] = (byte)(msgCount & 0xFF);
+        
+        byte[] firstPacket = Bytes.concat(new byte[]{(byte)(messageNumber & 0xFF)}, new byte[]{(byte)0x00, (byte)0x00}, msgSize, myDigest);
 
         // add the packet to this message
         addPacket(0, firstPacket);
+        Log.v(TAG, "packetize first:" + bytesToHex(firstPacket));
         
         int msgSequence = 1;
 					
@@ -142,12 +156,15 @@ public class BleMessage {
 			// leave room for the message counters
 			//Log.v(TAG, "rawMsg:" + String.valueOf(rawMsg.length) + ", currentReadIndex:" + String.valueOf(currentReadIndex));
 			byte[] val = Arrays.copyOfRange(MessageBytes, currentReadIndex, currentReadIndex + messagePacketSize - 2);
-			
-			byte[] msgHeader = {(byte) 0x02, (byte)(msgSequence & 0xFF)}; 
-	        val = Bytes.concat(msgHeader, val);
 
-	        addPacket(msgSequence, val);
+	        byte[] currentPacketCounter = new byte[2];
+	        currentPacketCounter[0] = (byte)(msgSequence >> 8);
+	        currentPacketCounter[1] = (byte)(msgSequence & 0xFF);
+ 
+	        val = Bytes.concat(new byte[]{(byte)(messageNumber & 0xFF)}, currentPacketCounter, val);
 	        
+	        addPacket(msgSequence, val);
+	        Log.v(TAG, "packetize the rest:" + bytesToHex(val));
 	        msgSequence++;
 			
 		}
@@ -283,6 +300,17 @@ public class BleMessage {
     	}
     	return nextMsg;
 	}
+
 	
+    final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+    public static String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        for ( int j = 0; j < bytes.length; j++ ) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+        }
+        return new String(hexChars);
+    }
 	
 }

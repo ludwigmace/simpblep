@@ -100,6 +100,8 @@ public class MainActivity extends Activity {
 		BleMessage m = new BleMessage();
 		m.setMessage(newMsg);
 		
+		Log.v(TAG, "my id msg is: " + bytesToHex(newMsg));
+		
 		// now add this message as our identifier to BleMessenger to send upon any new connection
 		bleMessenger.idMessage = m;
 	}

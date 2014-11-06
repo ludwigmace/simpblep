@@ -182,6 +182,8 @@ public class BleMessenger {
 	    		bleMessageMap =  new HashMap<Integer, BleMessage>();
 	    		CurrentParentMessage = 0;
 	    		
+	    		// the message itself needs to know what it's sequence is when sent to recipient
+	    		idMessage.SetMessageNumber(CurrentParentMessage);
 	    		// add our id message to this message map
 	    		bleMessageMap.put(0, idMessage);
 	    		
