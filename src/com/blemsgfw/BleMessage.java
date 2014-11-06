@@ -101,8 +101,29 @@ public class BleMessage {
 	}
 	
 	
-	public void setMessage(byte[] MessageBytes, int MessagePacketSize) {
+	public void setMessage(byte[] Payload, int MessagePacketSize) {
 
+		// for an id message:
+		// first byte, 0x01, indicates an identity message
+		// next 20 bytes are recipient fingerprint
+		// next 20 bytes are sender fingerprint
+		// final arbitrary bytes are the payload
+		
+		//byte[] newMsg = Bytes.concat(new byte[]{(byte)(0x01)}, new byte[20], rsaKey.PuFingerprint());
+		
+		byte[] MsgType;
+		
+		if (MessageType == "identity") {
+			MsgType = new byte[]{(byte)(0x01)};
+		} else {
+			MsgType = new byte[]{(byte)(0x02)};
+		}
+		
+		// Message Type, RFP, SFP, and payload
+		byte[] MessageBytes = Bytes.concat(MsgType, RecipientFingerprint, SenderFingerprint, Payload);
+		
+		Log.v(TAG, "MessageBytes: " + bytesToHex(MessageBytes));
+		
 		messagePacketSize = MessagePacketSize; 
 		
 		// clear the list of packets; we're building a new message using packets!
@@ -168,10 +189,6 @@ public class BleMessage {
 	        msgSequence++;
 			
 		}
-
-		// final packet will be an EOT
-		byte[] eot = {(byte) 0x04, (byte) 0x00};
-		addPacket(msgSequence, eot);
 
 		pendingPacketStatus = true;
 		

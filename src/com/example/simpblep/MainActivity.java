@@ -96,12 +96,16 @@ public class MainActivity extends Activity {
 		// the sender is our app, so the next 20 bytes are our fingerprint
 		
 		// now we need to create the payload with our friendly name and public key
-		byte[] newMsg = Bytes.concat(new byte[20], rsaKey.PuFingerprint());
+
 		BleMessage m = new BleMessage();
-		m.setMessage(newMsg);
 		
-		Log.v(TAG, "my id msg is: " + bytesToHex(newMsg));
+		m.MessageType = "identity";
+		m.SenderFingerprint = rsaKey.PuFingerprint();
+		m.RecipientFingerprint = new byte[20];
 		
+		// since this is an identity message, the payload is my public key
+		m.setMessage(rsaKey.PublicKey());
+
 		// now add this message as our identifier to BleMessenger to send upon any new connection
 		bleMessenger.idMessage = m;
 	}
