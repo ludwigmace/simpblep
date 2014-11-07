@@ -149,7 +149,7 @@ public class BleMessage {
 		}
         
         // i want my digest to be the packet size less the 3 bytes needed for counter and size
-        byte[] myDigest = Arrays.copyOfRange(md.digest(MessageBytes), 0, messagePacketSize - 5);
+        byte[] myDigest = Arrays.copyOfRange(md.digest(MessageBytes), 0, messagePacketSize - 4);
         
         Log.v(TAG, "first payload is of size: " + String.valueOf(myDigest.length));
         
