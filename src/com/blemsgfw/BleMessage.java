@@ -149,7 +149,7 @@ public class BleMessage {
 		}
         
         // i want my digest to be the packet size less the 3 bytes needed for counter and size
-        byte[] myDigest = Arrays.copyOfRange(md.digest(MessageBytes), 0, messagePacketSize - 4);
+        byte[] myDigest = Arrays.copyOfRange(md.digest(MessageBytes), 0, messagePacketSize - 5);
         
         Log.v(TAG, "first payload is of size: " + String.valueOf(myDigest.length));
         
@@ -172,11 +172,11 @@ public class BleMessage {
 					
 		while (msgSequence <= msgCount) {
 			
-			int currentReadIndex = ((msgSequence - 1) * (messagePacketSize - 2));
+			int currentReadIndex = ((msgSequence - 1) * (messagePacketSize - 3));
 		
 			// leave room for the message counters
 			//Log.v(TAG, "rawMsg:" + String.valueOf(rawMsg.length) + ", currentReadIndex:" + String.valueOf(currentReadIndex));
-			byte[] val = Arrays.copyOfRange(MessageBytes, currentReadIndex, currentReadIndex + messagePacketSize - 2);
+			byte[] val = Arrays.copyOfRange(MessageBytes, currentReadIndex, currentReadIndex + messagePacketSize - 3);
 
 	        byte[] currentPacketCounter = new byte[2];
 	        currentPacketCounter[0] = (byte)(msgSequence >> 8);
