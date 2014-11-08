@@ -101,7 +101,7 @@ public class MainActivity extends Activity {
 		
 		m.MessageType = "identity";
 		m.SenderFingerprint = rsaKey.PuFingerprint();
-		m.RecipientFingerprint = new byte[20];
+		m.RecipientFingerprint = new byte[20]; // blank recipient for Id message
 		
 		// since this is an identity message, the payload is my public key
 		m.setMessage(rsaKey.PublicKey());

@@ -37,6 +37,10 @@ public class BlePeer {
 		peerPublicKeyFingerprint = fp;
 	}
 	
+	public void SetFingerprint(String fp) {
+		peerPublicKeyFingerprint = hexToBytes(fp);
+	}
+	
 	public BleMessage getBleMessageIn(int MessageIdentifier) {
 
 		// if there isn't already a message with this identifier, add one
@@ -76,4 +80,15 @@ public class BlePeer {
         return new String(hexChars);
     }
 	
+    private static byte[] hexToBytes(String hex) {
+    	byte[] bytes = new byte[hex.length() / 2];
+    	
+    	for (int i = 0; i < bytes.length; i++) {
+    		bytes[i] = (byte) Integer.parseInt(hex.substring(2*i, 2*i+2),16);
+    		
+    	}
+    	
+    	return bytes;
+    }
+    
 }
