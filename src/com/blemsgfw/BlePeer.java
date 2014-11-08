@@ -33,6 +33,10 @@ public class BlePeer {
 		return bytesToHex(peerPublicKeyFingerprint);
 	}
 
+	public byte[] GetFingerprintBytes() {
+		return peerPublicKeyFingerprint;
+	}
+	
 	public void SetFingerprint(byte[] fp) {
 		peerPublicKeyFingerprint = fp;
 	}

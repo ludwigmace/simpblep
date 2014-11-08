@@ -44,13 +44,12 @@ public class BleMessenger {
     private String myFriendlyName;
     
     private int CurrentParentMessage;
-    private BlePeer CurrentPeer;
 
     // keep a map of our messages for a connection session - this may not work out; or we may need to keep a map per peer
     private Map<Integer, BleMessage> bleMessageMap;
     
     private Map<String, BlePeer> peerMap;
-    
+    private Map<String, String> fpNetMap;
     
 	public BleMessage idMessage;
     
@@ -145,21 +144,7 @@ public class BleMessenger {
     	}*/
     	
     }
-    
-    public void HandleIncomingID() {
-		
-		// now for this peer let's go ahead and pull all his messages and add them to our map
-		BlePeer p;
-		
-		String puKfingerprint = "";
-		p = peerMap.get(puKfingerprint);  // won't work, pulls of bt address
-		
-		// loop over p.getMessage(i) or something and do a bleMessageMap.put(x, msg) foreach
-		// . . . incrementing CurrentParentMessage each time
-		
-		// hole up, we don't have a peermap before this connection, at least based on device address
-		// it'll have to be based on ID sent to us, ie the PuKfp
-    }
+
 
     MyGattServerHandler defaultHandler = new MyGattServerHandler() {
     	
@@ -181,6 +166,8 @@ public class BleMessenger {
     		
 	    		// create/reset our message map for our connection
 	    		bleMessageMap =  new HashMap<Integer, BleMessage>();
+	    		
+	    		// this global "CurrentParentMessage" thing only works when sending in peripheral mode
 	    		CurrentParentMessage = 0;
 	    		
 	    		// the message itself needs to know what it's sequence is when sent to recipient
@@ -190,7 +177,9 @@ public class BleMessenger {
 	    		
 	    		Log.v(TAG, "id message added to connection's message map");
 	    		
-	    		CurrentPeer = new BlePeer(device); // make a new peer with their address, although that is unhelpful
+	    		 // create a new peer to hold messages and such for this network device
+	    		BlePeer p = new BlePeer(device);
+	    		peerMap.put(device, p);
     		
     		}
     		
@@ -217,8 +206,12 @@ public class BleMessenger {
         	int parentMessage = incomingBytes[0] & 0xFF;
         	int packetCounter = (incomingBytes[1] << 8) | incomingBytes[2] & 0xFF;
 
+        	// get the peer which matches the connected remote address 
+        	BlePeer p = peerMap.get(remoteAddress);
+        	
         	// find the message we're building, identified by the first byte (cast to an integer 0-255)
-        	BleMessage b = CurrentPeer.getBleMessageIn(parentMessage);
+        	// if this message wasn't already created, then the getBleMessageIn method will create it
+        	BleMessage b = p.getBleMessageIn(parentMessage);
         	
         	// your packet payload will be the size of the incoming bytes less our 3 needed for the header (ref'd above)
         	byte[] packetPayload = new byte[incomingBytes.length];
