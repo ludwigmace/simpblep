@@ -18,7 +18,6 @@ import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.util.Log;
-import android.widget.Button;
 import android.widget.Toast;
 
 public class BleMessenger {
@@ -29,9 +28,7 @@ public class BleMessenger {
 	private BluetoothAdapter btAdptr;
 	private Context ctx;
 	
-	private boolean messageInbound;
-	private boolean messageOutbound;
-	
+
 	//  this is defined by the framework, but certainly the developer or user can change it
     private static String uuidServiceBase = "73A20000-2C47-11E4-8C21-0800200C9A66";
     private static MyAdvertiser myGattServer = null;
@@ -39,7 +36,6 @@ public class BleMessenger {
     private BleStatusCallback bleStatusCallback;
         
     private BleMessage blmsgOut;
-    private BleMessage blmsgIn;
     
     private String myIdentifier;
     private String myFriendlyName;
@@ -112,7 +108,7 @@ public class BleMessenger {
 	}
 	
 	// maybe we shouldn't use this to send our identity stuff . . .
-    private void sendIndicateNotify(String remote, UUID uuid) {
+    private void sendOutgoing(String remote, UUID uuid) {
     	
     	// if we've got messages to send
     	if (bleMessageMap.size() > 0) {
@@ -133,7 +129,7 @@ public class BleMessenger {
 	    		CurrentParentMessage++;
 	    	} 
 	    	
-    		sendIndicateNotify(remote, uuid);
+	    	sendOutgoing(remote, uuid);
 	    	
     	}
     	// TODO: consider when to disconnect
@@ -189,14 +185,11 @@ public class BleMessenger {
     		Log.v(TAG, "incoming hex bytes:" + bytesToHex(incomingBytes));
     		
     		// if our msg is under a few bytes it can't be valid; return
-        	if (incomingBytes.length < 10) {
-        		Log.v(TAG, "message bytes less than 10");
+        	if (incomingBytes.length < 5) {
+        		Log.v(TAG, "message bytes less than 5");
         		return;
         	}
         	
-    		// stick our incoming bytes into a bytebuffer to do some operations
-        	ByteBuffer bb  = ByteBuffer.wrap(incomingBytes);
-        
         	// get the Message to which these packets belong as well as the current counter
         	int parentMessage = incomingBytes[0] & 0xFF;
         	int packetCounter = (incomingBytes[1] << 8) | incomingBytes[2] & 0xFF;
@@ -209,10 +202,7 @@ public class BleMessenger {
         	BleMessage b = p.getBleMessageIn(parentMessage);
         	
         	// your packet payload will be the size of the incoming bytes less our 3 needed for the header (ref'd above)
-        	byte[] packetPayload = new byte[incomingBytes.length];
-        	
-        	// throw these bytes into our payload array
-        	bb.get(packetPayload, 2, incomingBytes.length - 3);
+        	byte[] packetPayload = Arrays.copyOfRange(incomingBytes, 3, incomingBytes.length);
         	
         	// if our current packet counter is ZERO, then we can expect our payload to be:
         	// the number of packets we're expecting
@@ -246,7 +236,7 @@ public class BleMessenger {
 		public void handleNotifyRequest(String device, UUID uuid) {
     		// we're connected, so initiate send to "device", to whom we're already connected
     		Log.v(TAG, "from handleNotifyRequest, initiate sending messages");
-    		sendIndicateNotify(device, uuid);
+    		sendOutgoing(device, uuid);
 		}
 
 		@Override
