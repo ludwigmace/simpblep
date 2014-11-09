@@ -29,6 +29,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
@@ -39,11 +40,20 @@ public class MainActivity extends Activity {
 	BleMessenger bleMessenger;
 	Map <String, BlePeer> bleFriends;
 	String myFingerprint;
+	String myIdentifier;
+	
+	private Button btnAdvertise;
+	private boolean visible;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
+		
+		// we're not advertising when the program starts
+		visible = false;
+		
+		btnAdvertise = (Button)findViewById(R.id.be_a_friend);
 		
 		// because this is using BLE, we'll need to get the adapter and manager from the main context and thread 
 		BluetoothManager btMgr = (BluetoothManager) this.getSystemService(Context.BLUETOOTH_SERVICE);
@@ -56,32 +66,15 @@ public class MainActivity extends Activity {
         }
 
         // get an identifier for this installation
-        String myIdentifier = Installation.id(this);
+        myIdentifier = Installation.id(this);
         
         // get your name (that name part isn't working)
         String userName = getUserName(this.getContentResolver());
         EditText yourNameControl = (EditText) findViewById(R.id.your_name);
         yourNameControl.setText(userName);
 
+        // this isn't used right now
         BleMessengerOptions bo = new BleMessengerOptions();
-       
-        bo.FriendlyName = userName;
-        bo.Identifier = myIdentifier;
-        
-        KeyStuff rsaKey = null;
-        
-		try {
-			rsaKey = new KeyStuff(this, myIdentifier);
-		} catch (GeneralSecurityException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-		bo.PublicKey = rsaKey.PublicKey();
-		Log.v(TAG, "pubkey size in bytes:" + String.valueOf(bo.PublicKey.length));
-       
-		myFingerprint = bytesToHex(rsaKey.PuFingerprint());
 		
 		// create a messenger along with the context (for bluetooth operations)
 		bleMessenger = new BleMessenger(bo, btMgr, btAdptr, this, bleMessageStatus);
@@ -95,19 +88,6 @@ public class MainActivity extends Activity {
 		// there is no recipient, so the first 20 bytes are empty
 		// the sender is our app, so the next 20 bytes are our fingerprint
 		
-		// now we need to create the payload with our friendly name and public key
-
-		BleMessage m = new BleMessage();
-		
-		m.MessageType = "identity";
-		m.SenderFingerprint = rsaKey.PuFingerprint();
-		m.RecipientFingerprint = new byte[20]; // blank recipient for Id message
-		
-		// since this is an identity message, the payload is my public key
-		m.setMessage(rsaKey.PublicKey());
-
-		// now add this message as our identifier to BleMessenger to send upon any new connection
-		bleMessenger.idMessage = m;
 	}
 
 	@Override
@@ -201,13 +181,69 @@ public class MainActivity extends Activity {
             });
 			
 		}
+
+		@Override
+		public void advertisingStarted() {
+			showMessage("advertising started");
+			
+			runOnUiThread(new Runnable() {
+				  public void run() {
+						visible = true;
+						btnAdvertise.setText("Hide Yourself!");
+				  }
+				});
+			
+		}
+
+		@Override
+		public void advertisingStopped() {
+			showMessage("advertising stopped");
+			
+			runOnUiThread(new Runnable() {
+				  public void run() {
+						visible = false;
+						btnAdvertise.setText("Show Yourself!");
+				  }
+				});
+
+			
+		}
 		
 		
 	};
 	
 	public void handleButtonBeAFriend(View view) {
-		// time to advertise?
-		bleMessenger.BeFound();
+		// now we need to create the payload with our friendly name and public key
+
+		if (!visible) {
+	        KeyStuff rsaKey = null;
+	        
+			try {
+				rsaKey = new KeyStuff(this, myIdentifier);
+			} catch (GeneralSecurityException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+			myFingerprint = bytesToHex(rsaKey.PuFingerprint());
+			
+			BleMessage m = new BleMessage();
+			
+			m.MessageType = "identity";
+			m.SenderFingerprint = rsaKey.PuFingerprint();
+			m.RecipientFingerprint = new byte[20]; // blank recipient for Id message
+			
+			// since this is an identity message, the payload is my public key
+			m.setMessage(rsaKey.PublicKey());
+	
+			// now add this message as our identifier to BleMessenger to send upon any new connection
+			bleMessenger.idMessage = m;
+			
+			bleMessenger.BeFound();
+		} else {
+			bleMessenger.HideYourself();
+		}
 	}
 	
 	public void queueOutboundMessage(String destinationFingerprint, byte[] message) {

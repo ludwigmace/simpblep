@@ -18,6 +18,7 @@ import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.util.Log;
+import android.widget.Button;
 import android.widget.Toast;
 
 public class BleMessenger {
@@ -68,6 +69,8 @@ public class BleMessenger {
 		
 		// i need a place to put my found peers
 		peerMap = new HashMap<String, BlePeer>();
+	
+		fpNetMap = new HashMap<String, String>();
 		
 		// create your server for listening and your client for looking; Android can be both at the same time
 		myGattServer = new MyAdvertiser(uuidServiceBase, ctx, btAdptr, btMgr, defaultHandler);
@@ -88,15 +91,8 @@ public class BleMessenger {
 		
 		return idUUID;
 	}
-	
-	public void AddMessage() {
-	    
-	}
-	
-
-	
+		
 	public void BeFound() {
-	
 		
 		// have this pull from the service definition
 		myGattServer.addChar(MyAdvertiser.GATT_READ, uuidFromBase("100"), defaultHandler);
@@ -109,6 +105,10 @@ public class BleMessenger {
 		// advertising doesn't take much energy, so go ahead and do it
 		myGattServer.advertiseNow();
 		
+	}
+	
+	public void HideYourself() {
+		myGattServer.advertiseOff();
 	}
 	
 	// maybe we shouldn't use this to send our identity stuff . . .
@@ -124,24 +124,19 @@ public class BleMessenger {
 	    	byte[] nextPacket = blmsgOut.GetPacket().MessageBytes;
 	    	
 	    	// update the value of this characteristic, which will send to subscribers
-	    	Log.v(TAG, "send next packet");
 	    	myGattServer.updateCharValue(uuid, nextPacket);
 	    	
 	    	if (!blmsgOut.PendingPacketStatus()) {
-	    		Log.v(TAG, "message is sent, remove it from the map");
+	    		Log.v(TAG, "message sent, remove it from the map");
 	    		// if this message is sent, remove from our Map queue and increment our counter
 	    		bleMessageMap.remove(CurrentParentMessage);
 	    		CurrentParentMessage++;
 	    	} 
 	    	
-    		Log.v(TAG, "recurse!");
     		sendIndicateNotify(remote, uuid);
 	    	
-    	}/* else {
-    		// if we've got no more messages, then we need to call a disconnect
-    		// however if we 
-    		myGattServer.closeConnection();
-    	}*/
+    	}
+    	// TODO: consider when to disconnect
     	
     }
 
@@ -252,6 +247,15 @@ public class BleMessenger {
     		// we're connected, so initiate send to "device", to whom we're already connected
     		Log.v(TAG, "from handleNotifyRequest, initiate sending messages");
     		sendIndicateNotify(device, uuid);
+		}
+
+		@Override
+		public void handleAdvertiseChange(boolean advertising) {
+			if (advertising) {
+				bleStatusCallback.advertisingStarted();
+			} else {
+				bleStatusCallback.advertisingStopped();
+			}
 		}
     	
     };

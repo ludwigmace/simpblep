@@ -3,6 +3,9 @@ package com.blemsgfw;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+
+import android.util.Log;
 
 public class BlePeer {
 
@@ -22,6 +25,14 @@ public class BlePeer {
 		peerName="";
 		peerMessagesIn = new HashMap<Integer, BleMessage>();
 		peerMessagesOut = new HashMap<Integer, BleMessage>();
+	}
+	
+	public Map<Integer, BleMessage> GetMessageOut() {
+		return peerMessagesOut;
+	}
+	
+	public Map<Integer, BleMessage> GetMessageIn() {
+		return peerMessagesIn;
 	}
 	
 	public String RecipientAddress() {
@@ -56,13 +67,41 @@ public class BlePeer {
 	}
 	
 	public BleMessage getBleMessageOut(int MessageIdentifier) {
-
-		// if there isn't already a message with this identifier, add one
-		if (!peerMessagesOut.containsKey(MessageIdentifier)) {
-			peerMessagesOut.put(MessageIdentifier, new BleMessage());
-		}
 		
 		return peerMessagesOut.get(MessageIdentifier);
+	}
+	
+	public BleMessage getBleMessageOut() {
+		
+		// get the highest priority (0=highest) message to send out
+		int min = 0;
+		for (Integer i : peerMessagesOut.keySet()) {
+			if (i <= min ) {
+				min = i;
+			}
+		}
+		
+		Log.v(TAG, "getBleMessageOut #" + String.valueOf(min));
+		return getBleMessageOut(min);
+	}
+	
+	
+	public void addBleMessageOut(BleMessage m) {
+		
+		// find the highest message number
+		int max = 0;
+		
+		if (peerMessagesOut.size() > 0) {
+				for (Integer i : peerMessagesOut.keySet()) {
+					if (max <= i ) {
+						max = i;
+					}
+				}
+				max++;
+		}
+		
+		Log.v(TAG, "add message to peerMessagesOut #" + String.valueOf(max));
+		peerMessagesOut.put(max, m);		
 	}
 	
 	public void SetName(String PeerName) {
@@ -74,14 +113,26 @@ public class BlePeer {
 	}
 	
     final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+	private static final String TAG = "BlePeer";
     private static String bytesToHex(byte[] bytes) {
-        char[] hexChars = new char[bytes.length * 2];
-        for ( int j = 0; j < bytes.length; j++ ) {
-            int v = bytes[j] & 0xFF;
-            hexChars[j * 2] = hexArray[v >>> 4];
-            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
-        }
-        return new String(hexChars);
+    	
+    	String result = "";
+    	
+    	try {
+	        char[] hexChars = new char[bytes.length * 2];
+	        for ( int j = 0; j < bytes.length; j++ ) {
+	            int v = bytes[j] & 0xFF;
+	            hexChars[j * 2] = hexArray[v >>> 4];
+	            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+	        }
+	        result = new String(hexChars);
+    	} catch (Exception x) {
+    		result = "";
+    		Log.v(TAG, "error bytes to hex");
+    	}
+    	
+    	
+        return result;
     }
 	
     private static byte[] hexToBytes(String hex) {

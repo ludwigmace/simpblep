@@ -6,6 +6,8 @@ public interface MyGattServerHandler {
 	
 	public void ConnectionState(String device, int status, int newState);
 	
+	public void handleAdvertiseChange(boolean advertising);
+	
 	public void handleReadRequest(UUID uuid);
 		
 	public void handleNotifyRequest(String device, UUID uuid);

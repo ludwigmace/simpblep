@@ -11,5 +11,8 @@ public interface BleStatusCallback {
 	public void foundPeer(BlePeer blePeer);
 	
 	public void handleReceivedMessage(String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType);
+
+	public void advertisingStarted();
+	public void advertisingStopped();
 	
 }

@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.Map.Entry;
 
+import android.R;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -26,6 +27,7 @@ import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.content.Context;
 import android.os.ParcelUuid;
 import android.util.Log;
+import android.widget.Button;
 
 
 public class MyAdvertiser {
@@ -35,9 +37,8 @@ public class MyAdvertiser {
 	public static final String GATT_WRITE = "write";
 	public static final String GATT_INDICATE = "indicate";
 	public static final String GATT_READWRITE = "readwrite";
-	
-    private boolean gattAdvStatus;
 
+	
     private static final String TAG = "MyActivity";
     
     // all our BLE android objects
@@ -45,6 +46,8 @@ public class MyAdvertiser {
     private BluetoothAdapter btAdptr;
     private BluetoothLeAdvertiser btLeAdv;
     private BluetoothGattService theService;
+    
+    private boolean isAdvertising;
     
     private ArrayList<BluetoothGattService> gattServices;
     private ArrayList<MyGattServerHandler> gattHandlers;
@@ -79,7 +82,7 @@ public class MyAdvertiser {
 		
 		defaultHandler = myHandler;
 		
-        // API 5.0
+		// API 5.0
 		/*
 		if (btAdptr.isMultipleAdvertisementSupported()) {
 			Log.v(TAG, "advertisement is SUPPORT on this chipset!");
@@ -97,9 +100,10 @@ public class MyAdvertiser {
         gattServiceIDs = new ArrayList<ParcelUuid>();
         
         // we're not advertising yet
-        gattAdvStatus = false;
+        isAdvertising = false;
         
         gattHandlers = new ArrayList<MyGattServerHandler>();
+
 
    
 	}
@@ -158,16 +162,24 @@ public class MyAdvertiser {
 
 	
 	public void advertiseOff() {
-        if(!gattAdvStatus) return;
+		// if we're not advertising, then don't call this
+        if(!isAdvertising) return;
         
+        // flip our flag to indicate we're no longer advertising
+        isAdvertising = false;
+        
+        // tell the system's BluetoothLeAdvertiser to stop advertising
         btLeAdv.stopAdvertising(advertiseCallback);
         
+        // clear out the system's BluetoothGattServer's services, and close it
         btGattServer.clearServices();
         btGattServer.close();
+        
+        // clear our local list of advertised services
         gattServices.clear();
         
         theService = null;
-        gattAdvStatus = false;
+        
 	}
 	
 	
@@ -177,13 +189,12 @@ public class MyAdvertiser {
 	
 	public void advertiseNow() {
 
+		// if we don't have a handle to the system advertiser, then just stop
         if (btLeAdv == null) {
         	Log.v(TAG, "btLeAdv is null!");
-        	gattAdvStatus = false;
+        	isAdvertising = false;
         	return;
         }
-		
-		
 		
 		// make our Base UUID the service UUID
         UUID serviceUUID = UUID.fromString(theBaseUUID);
@@ -204,8 +215,9 @@ public class MyAdvertiser {
     	gattServices.add(theService);
         gattServiceIDs.add(new ParcelUuid(theService.getUuid()));
 
-    	// if we're already advertising, just exit
-        if(gattAdvStatus) return;
+    	// if we're already advertising, just quit here
+        //  TODO: if we get this far and advertising is already started, we may want reset everything!
+        if(isAdvertising) return;
 
         // - calls bluetoothManager.openGattServer(activity, whatever_the_callback_is) as gattServer
         // --- this callback needs to override: onCharacteristicWriteRequest, onCharacteristicReadRequest,
@@ -274,11 +286,16 @@ public class MyAdvertiser {
         // - looks like we also need to have an advertiseCallback
         // --- this needs to override onSuccess and onFailure, and really those are just for debug messages
         // --- but it looks like you HAVE to do this
-        btLeAdv.startAdvertising(settingsBuilder.build(), dataBuilder.build(), advertiseCallback);
-        
         // set our boolean so we don't try to re-advertise
-        gattAdvStatus = true;
+        isAdvertising = true;
        
+        try {
+        	btLeAdv.startAdvertising(settingsBuilder.build(), dataBuilder.build(), advertiseCallback);
+        } catch (Exception ex) {
+        	isAdvertising = false;	
+        }
+        
+
 
 	}
 	
@@ -472,14 +489,15 @@ public class MyAdvertiser {
         @Override
         public void onCharacteristicWriteRequest(BluetoothDevice device, int requestId, BluetoothGattCharacteristic characteristic, boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
 
+        	Log.v(TAG, "write request incoming, bytes:" + bytesToHex(value));
+        	
         	characteristic.setValue(value);
         	
         	// get the characteristic that was affected, and call its handler!
             MyBluetoothGattCharacteristic myBGC = (MyBluetoothGattCharacteristic) myBGCs.get(characteristic.getUuid());
-
+            
             // since this is a Write request, use the incomingBytes method for the characteristic we want
             // -- device, requestId, characteristic, preparedwrite, responseneeded, offset, value
-            Log.v(TAG, "we got bytes coming in, about to handle them");
             myBGC.charHandler.incomingMissive(device.getAddress(), characteristic.getUuid(), value);
             
         	// An application must call sendResponse(BluetoothDevice, int, int, int, byte[]) to complete the request.        	
@@ -487,7 +505,7 @@ public class MyAdvertiser {
         }
     };
 
-    // wow, advertising worked - you really don't need to do anything here
+    // advertising worked - you can use this to notify
     private AdvertiseCallback advertiseCallback = new AdvertiseCallback() {
         @Override
         //public void onStartSuccess(AdvertiseSettings aS) {
@@ -524,9 +542,8 @@ public class MyAdvertiser {
         	//aS.getTxPowerLevel(); // 0: ultra low, 1: low, 2: medium, 3: high
             
             //Log.v(TAG, "success_" + String.valueOf(bType) + String.valueOf(iMode) + String.valueOf(iPowerLevel));
-        	
-        	//defaultHandler.DoStuff("success_" + String.valueOf(gattAdvStatus));
-            
+
+        	defaultHandler.handleAdvertiseChange(isAdvertising);
         }
 
         @Override
@@ -534,10 +551,22 @@ public class MyAdvertiser {
         public void onFailure(int i) {
             String failMsg = "Advertisement command attempt failed: " + i;
             Log.e(TAG, failMsg);
+            defaultHandler.handleAdvertiseChange(false);
             
         }
 
     };
+    
+    final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+    public static String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        for ( int j = 0; j < bytes.length; j++ ) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+        }
+        return new String(hexChars);
+    }
 
 	
 }
