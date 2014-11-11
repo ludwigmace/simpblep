@@ -8,8 +8,6 @@ public interface MyGattServerHandler {
 	
 	public void handleAdvertiseChange(boolean advertising);
 	
-	public void handleReadRequest(UUID uuid);
-		
 	public void handleNotifyRequest(String device, UUID uuid);
 	
 	public void incomingMissive(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes);

@@ -1,5 +1,8 @@
 package com.blemsgfw;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -27,6 +30,23 @@ public class BlePeer {
 		peerMessagesOut = new HashMap<Integer, BleMessage>();
 	}
 	
+	private boolean checkDigest(byte[] digest, byte[] payload) {
+        MessageDigest md = null;
+        boolean status = false;
+        try {
+			md = MessageDigest.getInstance("SHA-1");
+		} catch (NoSuchAlgorithmException e) {
+
+			e.printStackTrace();
+		}
+        
+        if (Arrays.equals(md.digest(payload), digest)) {
+        	status = true;	
+        }
+
+        return status;
+	}
+	
 	public Map<Integer, BleMessage> GetMessageOut() {
 		return peerMessagesOut;
 	}
@@ -37,6 +57,20 @@ public class BlePeer {
 	
 	public String RecipientAddress() {
 		return peerAddress;
+	}
+	
+	public byte[] GetPublicKey() {
+		return peerPublicKey;
+	}
+	
+	public boolean SetPublicKey(byte[] publicKey) {
+		boolean status = true;
+		
+		peerPublicKey = publicKey;
+		
+		status = checkDigest(peerPublicKeyFingerprint, publicKey);
+		
+		return status;
 	}
 	
 	

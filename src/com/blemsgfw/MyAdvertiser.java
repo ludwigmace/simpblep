@@ -482,7 +482,7 @@ public class MyAdvertiser {
             btGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, characteristic.getValue());
             
             // since this is a Read request,  we can act on the fact this msg was read
-            myBGC.charHandler.handleReadRequest(characteristic.getUuid());
+            //myBGC.charHandler.handleReadRequest(characteristic.getUuid());
 
         }
 
